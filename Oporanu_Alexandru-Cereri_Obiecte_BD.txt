@@ -1,0 +1,221 @@
+-- EXERCITIUL 11
+-- join pe cel putin 4 tabele plus ordonare plus filtrare la nivel de linii
+select o.nume_oras, e.suma
+from card c, atm a, sediu s, locatie l, oras o, extrageri e
+where c.id_card = 810
+and
+c.id_card = e.id_card
+and 
+e.id_atm = a.id_atm
+and
+a.id_sediu = s.id_sediu
+and s.id_locatie = l.id_locatie
+and
+l.id_oras = o.id_oras
+order by e.suma;
+
+
+-- afisati numele, prenumele si salariu
+-- angajatilor care lucreaza la bancile care sunt partenere 
+-- cu magazinul auchan (adica la cele unde se poate plati cu cardul la supermarketul respectiv)
+-- subcerere necorelata pe minim 3 tabele plus o functie pe siruri de caractere
+SELECT a.nume, a.prenume, a.salariu 
+from angajat a
+where a.id_sediu in (
+                      select id_sediu
+                      from sediu s, banca b, accepta ac, magazin m
+                      where s.id_banca = b.id_banca
+                      and b.id_banca = ac.id_banca
+                      and ac.id_magazin = m.id_magazin
+                      and lower(m.nume_magazin) = 'auchan'
+                    );
+                    
+-- dintre angajatii tuturor bancilor selectati-i pe aceia 
+-- care castiga mai mult decat media celor care lucreaza la BCR si 
+-- sunt angajati dupa ei (subcerere corelata in care intervin >3 tabele
+-- plus inca o functie pe siruri de caractere plus functie group plus o functie pe date calendaristice
+select a.nume, a.prenume
+from angajat a
+where a.salariu > (select avg(a2.salariu)
+                   from angajat a2, sediu s, banca b
+                   where to_char(a2.data_angajare) > a.data_angajare
+                   and a2.id_sediu = s.id_sediu
+                   and s.id_banca = b.id_banca
+                   and upper(b.denumire_banca) = 'BCR');
+
+-- afisati, pentru cardurile care expira in 2022 sau 2023 textul 'expira in anul <2022/2023> si
+-- pentru celelalte textul 'cardul expira altcandva' si specificati limita de extragere daca exista,
+-- sau textul 'cardul nu are limita de extragere' daca nu are
+-- nvl + decode + cealalta functie pe siruri de caractere
+
+select c.id_card, c.cvv, nvl(to_char(c.limita_extragere), 'cardul nu are limita de extragere !') as "limita extragere",
+      decode(to_char(c.data_exp, 'YYYY'),
+      '2023', 'cardul expira in 2023',
+      '2022', 'cardul expira in 2022',
+      'cardul expira altcandva !')
+      as "exp in 2022 sau 2023"
+from card c;
+
+--afisati, pentru cardurile care expira in 2022 sau 2023 textul 'expira in anul <2022/2023> si
+-- pentru celelalte textul 'cardul expira altcandva' si specificati limita de extragere daca exista,
+-- sau textul 'cardul nu are limita de extragere' daca nu are
+-- nvl + decode + cealalta functie pe siruri de caractere
+
+select c.id_card, c.cvv, nvl(to_char(c.limita_extragere), 'cardul nu are limita de extragere !') as "limita extragere",
+      decode(to_char(c.data_exp, 'YYYY'),
+      '2023', 'cardul expira in 2023',
+      '2022', 'cardul expira in 2022',
+      'cardul expira altcandva !')
+      as " expira in 2022 sau 2023"
+from card c;
+
+
+--si case
+select c.id_card, c.cvv, nvl(to_char(c.limita_extragere), 'cardul nu are limita de extragere !') as "limita extragere",
+        Case to_char(c.data_exp, 'YYYY')
+        WHEN '2023' THEN 'cardul expira in 2023'
+        WHEN '2022' THEN 'cardul expira in 2022'
+        ELSE 'cardul expira altcandva !'
+        end 
+        AS " expira in 2022 sau 2023"
+FROM card c;
+
+--GROUP
+select id_sediu, count(*)
+from angajat
+WHERE id_sediu > 2005
+group by id_sediu
+having count(*) > 2;
+
+-- WITH
+with salarii3 as ( select * 
+                  from (select distinct salariu
+                          from angajat 
+                          order by salariu asc)
+                  where rownum<=3)
+select nume, prenume, id_angajat, salariu
+from angajat
+where salariu in (select * from salarii3);
+
+
+-- EXERCITIUL 12
+
+-- modificati salariu angajatei care are numele de familiei 'Matache'
+-- astfel incat sa fie egal cu salariu Mariei Ionescu
+-- apoi anulati schimbarile
+update angajat
+set salariu = (select salariu
+                  from angajat
+                  where lower(nume) = 'ionescu'
+                  and lower(prenume) = 'maria')
+where upper(nume) = 'MATACHE';
+
+rollback;
+
+
+select *
+from card;
+
+--- modificati limita de extragere a cardului care are valoarea cvv-ului = 125 cu limita de extragere
+--- a cardului care are cvv-ul 129, apoi anulati schimbarile
+
+update card
+set limita_extragere = (select limita_extragere
+                        from card
+                        where cvv = 129)
+where cvv = 125;
+
+select *
+from card;
+
+rollback;
+
+
+--stergeti angajatii interni care lucreaza la banca cu id-ul 106 (adica First Bank)
+-- apoi anulati schimbarile
+delete from angajat_intern
+ where id_intern in (select id_angajat
+                     from angajat a, sediu s
+                     where a.id_sediu = s.id_sediu
+                     and s.id_banca = 106
+                      );-- s au sters doua linii
+rollback;
+                      
+
+rollback; 
+
+                      
+select *
+from angajat;-- ar trebui 4
+
+select *
+from sediu; ---  fb 2011 2012
+
+--EXERCITIUL 13
+-- am creat o secventa care incrementeaza salariul cu 1000
+create sequence secv_salariu
+start with 1000
+increment by 4000
+maxvalue 90000
+nocycle
+nocache;
+
+select * from angajat;
+insert into angajat
+values(9041, '2002', 'Popescu', 'Mihail', '0743038873','17-JUN-17', secv_salariu.nextval); 
+insert into angajat
+values(9042, '2004', 'Protopopescu', 'Mihail', '0743038872','16-JUN-17', secv_salariu.nextval); 
+
+select * from angajat;
+
+-- EXERCITIUL 16
+
+-- outer join pe 4 tabele
+-- selectati pentru fiecare angajat orasul in care lucreaza
+-- am facut outer join pe 4 tabele,
+-- deoarece aveam un angajat care nu are sediul setat,
+-- dar prin outer join l am afisar si pe el cu orasul null
+select a.id_angajat, o.nume_oras
+from angajat a, sediu s, locatie l, oras o
+where a.id_sediu = s.id_sediu(+)
+and 
+s.id_locatie = l.id_locatie(+)
+and
+l.id_oras = o.id_oras(+);
+
+
+
+-- DIVISION, prima forma
+-- selectati cardurile de pe care s a extras de la toate atm-urile
+-- cu id-ul sediului 2002
+-- atmurile respective au id-urile 9002, 9003 si 9004
+-- asadar singurul este 802
+select c.id_card 
+FROM		(select distinct id_card from extrageri) c 
+where not exists(
+  (select id_atm
+   from atm
+   where id_sediu = 2002)
+   minus
+   (select e2.id_atm
+    from extrageri e2
+    where e2.id_card = c.id_card)
+);
+
+--a doua forma de division, rezolva aceeasi
+-- problema ca prima forma
+select distinct id_card
+from extrageri e
+where not exists(
+    select id_atm
+    from atm a
+    where a.id_sediu = 2002
+    and 
+    not exists
+    (
+      select id_atm
+      from extrageri e1
+      where e1.id_atm = a.id_atm
+      and e1.id_card = e.id_card
+    )
+    );
